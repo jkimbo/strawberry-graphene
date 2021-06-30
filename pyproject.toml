@@ -5,7 +5,7 @@ description = ""
 authors = ["Jonathan Kim <jkimbo@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.7"
 strawberry-graphql = "^0.64.1"
 graphene = "^3.0.0b7"
 
