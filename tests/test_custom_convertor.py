@@ -248,9 +248,3 @@ def test_mutation():
     )
     assert not result.errors
     assert result.data == {"addUser": {"user": {"username": "jkimbo"}}}
-
-
-# TODO
-# test mutations
-# test graphene type referring to Strawberry type
-# test resolving graphene type from Strawberry type

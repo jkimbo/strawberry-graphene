@@ -1,4 +1,4 @@
-from typing import Type, Optional, Sequence, List, Dict, Union, Any
+from typing import Type, Optional, Sequence, List, Union, Any
 from decimal import Decimal
 
 import strawberry
