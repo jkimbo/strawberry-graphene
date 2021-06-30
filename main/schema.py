@@ -104,9 +104,6 @@ class Schema(strawberry.Schema):
             types=list(map(self.schema_converter.from_object_type, types)),
         )
 
-        # Merge type maps
-        # self.schema_converter.type_map.update(self.schema_converter.graphene_type_map)
-
         # Validate schema early because we want developers to know about
         # possible issues as soon as possible
         errors = validate_schema(self._schema)
