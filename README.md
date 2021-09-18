@@ -2,6 +2,8 @@
 
 Provide a way to use both Strawberry and Graphene types in the same schema.
 
+**Note:** Requires Graphene v3
+
 **⚠️ This library is experimental**
 
 ## Setup
