@@ -3,7 +3,7 @@ from decimal import Decimal
 import graphene
 import strawberry
 
-from main.schema import Schema
+from strawberry_graphene.schema import Schema
 
 
 def test_convert_graphene_basic():

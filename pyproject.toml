@@ -6,8 +6,8 @@ authors = ["Jonathan Kim <jkimbo@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
-strawberry-graphql = ">=0.64.1"
-graphene = ">=3.0.0b7"
+strawberry-graphql = ">=0.87.2"
+graphene = ">=3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.4"
