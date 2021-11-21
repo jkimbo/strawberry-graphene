@@ -1,10 +1,20 @@
+import asyncio
+import os
 from decimal import Decimal
 from textwrap import dedent
 
+import django
 import graphene
 import strawberry
 
+from strawberry_graphene.extension import SyncToAsync
 from strawberry_graphene.schema import Schema
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.app.settings')
+
+django.setup()
+
+from django.contrib.auth.models import User as DjangoUser
 
 
 def test_convert_graphene_basic():
@@ -144,7 +154,7 @@ def test_convert_graphene_more():
         """
     ).strip()
 
-    print( str(schema))
+    print(str(schema))
 
     assert str(schema) == expected
 
@@ -331,5 +341,66 @@ def test_mutation():
         }
         """
     )
+    assert not result.errors
+    assert result.data == {"addUser": {"user": {"username": "jkimbo"}}}
+
+
+def test_mutation_async():
+    @strawberry.type
+    class User:
+        username: str
+
+    class AddUser(graphene.Mutation):
+        class Arguments:
+            username = graphene.String(required=True)
+
+        user = graphene.Field(User)
+
+        def mutate(self, info, username):
+            # create a new Django User
+            user = DjangoUser.objects.get_or_create(email='user@email.fake')
+            return AddUser(user=User(username))
+
+    class Mutation(graphene.ObjectType):
+        add_user = AddUser.Field()
+
+    @strawberry.type
+    class Query:
+        hi: str
+
+    schema = Schema(Query, mutation=Mutation, extensions=[SyncToAsync(), ], )
+
+    expected = dedent(
+        """\
+        type AddUser {
+          user: User
+        }
+
+        type Mutation {
+          addUser(username: String!): AddUser
+        }
+
+        type Query {
+          hi: String!
+        }
+
+        type User {
+          username: String!
+        }
+        """
+    ).strip()
+    assert str(schema) == expected
+
+    result = asyncio.run(schema.execute(
+        """
+        mutation AddUser {
+            addUser(username: "jkimbo") {
+                user {
+                    username
+                }
+            }
+        }
+        """
+    ))
     assert not result.errors
     assert result.data == {"addUser": {"user": {"username": "jkimbo"}}}

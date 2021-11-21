@@ -28,6 +28,7 @@ from strawberry.schema.types.scalar import DEFAULT_SCALAR_REGISTRY
 from strawberry.types.types import TypeDefinition
 from strawberry.union import StrawberryUnion
 
+from strawberry_graphene.extension import SyncToAsync
 
 class GraphQLCoreConverter(schema_converter.GraphQLCoreConverter):
     def __init__(self, *args, **kwargs):
