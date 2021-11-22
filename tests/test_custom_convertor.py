@@ -1,9 +1,20 @@
-from textwrap import dedent
+import asyncio
+import os
 from decimal import Decimal
+from textwrap import dedent
+
+import django
 import graphene
 import strawberry
 
-from main.schema import Schema
+from strawberry_graphene.extension import SyncToAsync
+from strawberry_graphene.schema import Schema
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.app.settings')
+
+django.setup()
+
+from django.contrib.auth.models import User as DjangoUser
 
 
 def test_convert_graphene_basic():
@@ -28,6 +39,42 @@ def test_convert_graphene_basic():
 
 
 def test_convert_graphene_more():
+    class GraphQLFramework(graphene.Interface, ):
+        id = graphene.ID()
+        graphql_core = graphene.String()
+
+    class GrapheneV2(graphene.ObjectType):
+        class Meta:
+            interfaces = (GraphQLFramework,)
+
+        def resolve_id(root, info):
+            return "1"
+
+        def resolve_graphql_core(root, info):
+            return "legacy"
+
+    class GrapheneV3(graphene.ObjectType):
+        class Meta:
+            interfaces = (GraphQLFramework,)
+
+        def resolve_id(root, info):
+            return "2"
+
+        def resolve_graphql_core(root, info):
+            return "v3"
+
+    class Strawberry(graphene.ObjectType):
+        class Meta:
+            interfaces = (GraphQLFramework,)
+
+        def resolve_id(root, info):
+            return "3"
+
+        def resolve_graphql_core(root, info):
+            return "v3"
+
+    lst_qrcodes_interface_types = [GrapheneV2, GrapheneV3, Strawberry]
+
     class PetType(graphene.Enum):
         DOG = "dog"
         CAT = "cat"
@@ -39,6 +86,8 @@ def test_convert_graphene_more():
     class User(graphene.ObjectType):
         id = graphene.ID()
         pets = graphene.List(Pet)
+        previous_framework = graphene.Field(GraphQLFramework)
+        current_framework = graphene.Field(GraphQLFramework)
 
         def resolve_pets(root, info):
             return [
@@ -46,36 +95,66 @@ def test_convert_graphene_more():
                 {"name": "Spot", "pet_type": PetType.DOG},
             ]
 
+        def resolve_previous_framework(root, info):
+            return GrapheneV2()
+
+        def resolve_current_framework(root, info):
+            return Strawberry()
+
     class Query(graphene.ObjectType):
         user = graphene.Field(User, id=graphene.ID(required=True))
 
         def resolve_user(self, info, id):
             return User(id=id)
 
-    schema = Schema(query=Query)
+    schema = Schema(query=Query, types=lst_qrcodes_interface_types)
 
     expected = dedent(
         """\
+        interface GraphQLFramework {
+          id: ID
+          graphqlCore: String
+        }
+        
+        type GrapheneV2 implements GraphQLFramework {
+          id: ID
+          graphqlCore: String
+        }
+        
+        type GrapheneV3 implements GraphQLFramework {
+          id: ID
+          graphqlCore: String
+        }
+        
         type Pet {
           name: String
           petType: PetType
         }
-
+        
         enum PetType {
           DOG
           CAT
         }
-
+        
         type Query {
           user(id: ID!): User
         }
-
+        
+        type Strawberry implements GraphQLFramework {
+          id: ID
+          graphqlCore: String
+        }
+        
         type User {
           id: ID
           pets: [Pet]
+          previousFramework: GraphQLFramework
+          currentFramework: GraphQLFramework
         }
         """
     ).strip()
+
+    print(str(schema))
 
     assert str(schema) == expected
 
@@ -88,6 +167,14 @@ def test_convert_graphene_more():
               name
               petType
             }
+            previousFramework {
+              id
+              graphqlCore
+            }
+            currentFramework {
+              id
+              graphqlCore
+            }            
           }
         }
     """
@@ -106,6 +193,14 @@ def test_convert_graphene_more():
                     "petType": "DOG",
                 },
             ],
+            "previousFramework": {
+                "id": "1",
+                "graphqlCore": "legacy",
+            },
+            "currentFramework": {
+                "id": "3",
+                "graphqlCore": "v3",
+            },
         }
     }
 
@@ -246,5 +341,66 @@ def test_mutation():
         }
         """
     )
+    assert not result.errors
+    assert result.data == {"addUser": {"user": {"username": "jkimbo"}}}
+
+
+def test_mutation_async():
+    @strawberry.type
+    class User:
+        username: str
+
+    class AddUser(graphene.Mutation):
+        class Arguments:
+            username = graphene.String(required=True)
+
+        user = graphene.Field(User)
+
+        def mutate(self, info, username):
+            # create a new Django User
+            user = DjangoUser.objects.get_or_create(email='user@email.fake')
+            return AddUser(user=User(username))
+
+    class Mutation(graphene.ObjectType):
+        add_user = AddUser.Field()
+
+    @strawberry.type
+    class Query:
+        hi: str
+
+    schema = Schema(Query, mutation=Mutation, extensions=[SyncToAsync(), ], )
+
+    expected = dedent(
+        """\
+        type AddUser {
+          user: User
+        }
+
+        type Mutation {
+          addUser(username: String!): AddUser
+        }
+
+        type Query {
+          hi: String!
+        }
+
+        type User {
+          username: String!
+        }
+        """
+    ).strip()
+    assert str(schema) == expected
+
+    result = asyncio.run(schema.execute(
+        """
+        mutation AddUser {
+            addUser(username: "jkimbo") {
+                user {
+                    username
+                }
+            }
+        }
+        """
+    ))
     assert not result.errors
     assert result.data == {"addUser": {"user": {"username": "jkimbo"}}}
